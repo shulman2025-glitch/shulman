@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>בודק אלרגנים</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: rgba(255,255,255,0.08);
+    --text: #f0ede8;
+    --text2: #9a9690;
+    --text3: #5a5855;
+    --danger-bg: rgba(239,68,68,0.12);
+    --danger: #f87171;
+    --danger-border: rgba(239,68,68,0.3);
+    --warn-bg: rgba(251,146,60,0.12);
+    --warn: #fb923c;
+    --warn-border: rgba(251,146,60,0.3);
+    --safe-bg: rgba(74,222,128,0.1);
+    --safe: #4ade80;
+    --safe-border: rgba(74,222,128,0.25);
+    --accent: #4ade80;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 2rem;
+  }
+
+  .header {
+    padding: 1.5rem 1.25rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+  .logo span { color: var(--accent); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .container { padding: 1.25rem; max-width: 480px; margin: 0 auto; }
+
+  /* Profile */
+  .section-label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .1em;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: .6rem;
+  }
+  .profile-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .9rem 1rem;
+    margin-bottom: 1.25rem;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 13px;
+    font-family: 'Heebo', sans-serif;
+    padding: 5px 14px;
+    border-radius: 99px;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    background: transparent;
+    cursor: pointer;
+    transition: all .2s;
+    user-select: none;
+  }
+  .chip.on {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border-color: var(--danger-border);
+  }
+
+  /* Scan button */
+  .scan-btn {
+    width: 100%;
+    padding: 1rem;
+    border-radius: var(--radius);
+    background: var(--accent);
+    color: #0f0f0f;
+    border: none;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: 'Heebo', sans-serif;
+    cursor: pointer;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity .2s, transform .1s;
+    letter-spacing: -0.01em;
+  }
+  .scan-btn:active { transform: scale(0.98); opacity: .9; }
+  .scan-btn.active {
+    background: var(--surface2);
+    color: var(--text2);
+    border: 1px solid var(--border);
+  }
+
+  /* Camera */
+  .scanner-section {
+    display: none;
+    margin-bottom: 1.25rem;
+  }
+  .scanner-section.open { display: block; }
+  #video-container {
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #000;
+    position: relative;
+    aspect-ratio: 4/3;
+  }
+  #video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  .scan-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .scan-frame {
+    width: 220px;
+    height: 130px;
+    position: relative;
+  }
+  .scan-frame::before, .scan-frame::after,
+  .sf-bl::before, .sf-bl::after {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-color: var(--accent);
+    border-style: solid;
+  }
+  .scan-frame::before { top: 0; right: 0; border-width: 2px 2px 0 0; border-radius: 0 6px 0 0; }
+  .scan-frame::after  { top: 0; left: 0;  border-width: 2px 0 0 2px; border-radius: 6px 0 0 0; }
+  .sf-bl::before      { bottom: 0; right: 0; border-width: 0 2px 2px 0; border-radius: 0 0 6px 0; }
+  .sf-bl::after       { bottom: 0; left: 0;  border-width: 0 0 2px 2px; border-radius: 0 0 0 6px; }
+  .scan-line {
+    position: absolute;
+    left: 4px; right: 4px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: scanmove 2s ease-in-out infinite;
+    border-radius: 2px;
+  }
+  @keyframes scanmove { 0%{top:8px;opacity:1} 90%{top:114px;opacity:1} 100%{top:114px;opacity:0} }
+
+  .cam-hint {
+    position: absolute;
+    bottom: 12px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 12px;
+    color: rgba(255,255,255,.45);
+  }
+
+  /* Manual input */
+  .manual-row {
+    display: flex;
+    gap: 8px;
+    margin-top: .75rem;
+  }
+  .manual-input {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: .65rem 1rem;
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'Heebo', sans-serif;
+    outline: none;
+    transition: border-color .2s;
+    direction: ltr;
+  }
+  .manual-input:focus { border-color: rgba(74,222,128,.4); }
+  .manual-input::placeholder { color: var(--text3); }
+  .manual-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'Heebo', sans-serif;
+    font-size: 13px;
+    padding: .65rem 1rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .2s;
+  }
+  .manual-btn:hover { background: var(--surface); }
+
+  /* Demo products */
+  .demo-section {
+    margin-top: .75rem;
+  }
+  .demo-scroll {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .demo-scroll::-webkit-scrollbar { display: none; }
+  .demo-tag {
+    font-size: 12px;
+    font-family: 'Heebo', sans-serif;
+    white-space: nowrap;
+    padding: 5px 12px;
+    border-radius: 99px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    cursor: pointer;
+    transition: all .2s;
+    flex-shrink: 0;
+  }
+  .demo-tag:hover { border-color: rgba(74,222,128,.3); color: var(--accent); }
+
+  /* Loading */
+  .loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 1.25rem;
+    background: var(--surface);
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+    color: var(--text2);
+    font-size: 14px;
+  }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Result */
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 1rem;
+    animation: slideup .25s ease;
+  }
+  @keyframes slideup { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+
+  .banner {
+    padding: .85rem 1.1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .banner.danger { background: var(--danger-bg); border-bottom: 1px solid var(--danger-border); }
+  .banner.warn   { background: var(--warn-bg);   border-bottom: 1px solid var(--warn-border); }
+  .banner.safe   { background: var(--safe-bg);   border-bottom: 1px solid var(--safe-border); }
+
+  .banner-icon {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .danger .banner-icon { background: rgba(239,68,68,.2); }
+  .warn   .banner-icon { background: rgba(251,146,60,.2); }
+  .safe   .banner-icon { background: rgba(74,222,128,.15); }
+
+  .banner-text .btitle {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .danger .btitle { color: var(--danger); }
+  .warn   .btitle { color: var(--warn); }
+  .safe   .btitle { color: var(--safe); }
+  .banner-text .bsub { font-size: 12px; color: var(--text2); }
+
+  .card-body { padding: 1rem 1.1rem; }
+  .pname { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+  .pbrand { font-size: 13px; color: var(--text2); margin-bottom: 10px; }
+
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .barcode-num {
+    font-size: 11px;
+    font-family: monospace;
+    color: var(--text3);
+    letter-spacing: .05em;
+  }
+  .src-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    font-weight: 500;
+  }
+  .src-off   { background: rgba(96,165,250,.15); color: #60a5fa; }
+  .src-local { background: rgba(251,146,60,.12); color: var(--warn); }
+
+  .ing-label { font-size: 10px; letter-spacing: .1em; color: var(--text3); text-transform: uppercase; margin-bottom: 5px; }
+  .ing-text { font-size: 13px; color: var(--text2); line-height: 1.7; }
+  .hi-ing {
+    color: var(--danger);
+    font-weight: 500;
+    background: var(--danger-bg);
+    border-radius: 4px;
+    padding: 0 3px;
+  }
+
+  .freshness-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .fresh-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .fresh-msg { font-size: 11px; color: var(--text2); flex: 1; }
+  .report-btn {
+    font-size: 11px;
+    color: var(--text3);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Heebo', sans-serif;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background .2s, color .2s;
+    white-space: nowrap;
+  }
+  .report-btn:hover { background: var(--surface2); color: var(--text); }
+
+  /* Not found */
+  .not-found {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem 1.1rem;
+    text-align: center;
+    margin-bottom: 1rem;
+  }
+  .not-found .nf-title { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
+  .not-found .nf-sub { font-size: 13px; color: var(--text2); line-height: 1.6; }
+  .add-btn {
+    margin-top: 1rem;
+    padding: .65rem 1.5rem;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    color: var(--text);
+    font-family: 'Heebo', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color .2s;
+  }
+  .add-btn:hover { border-color: rgba(74,222,128,.4); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    padding: 10px 20px;
+    font-size: 13px;
+    color: var(--text);
+    white-space: nowrap;
+    animation: toastin .25s ease, toastout .3s ease 2.5s forwards;
+    z-index: 100;
+  }
+  @keyframes toastin  { from{opacity:0;transform:translateX(-50%) translateY(10px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+  @keyframes toastout { to{opacity:0;transform:translateX(-50%) translateY(10px)} }
+
+  /* Error */
+  .cam-error {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text2);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">בודק<span>אלרגנים</span></div>
+  <div class="status-dot"></div>
+</div>
+
+<div class="container">
+
+  <div class="profile-box">
+    <div class="section-label">האלרגנים שלי</div>
+    <div class="chips" id="chips">
+      <button class="chip on" data-a="peanut">בוטנים</button>
+      <button class="chip on" data-a="milk">חלב</button>
+      <button class="chip" data-a="gluten">גלוטן</button>
+      <button class="chip" data-a="egg">ביצים</button>
+      <button class="chip" data-a="sesame">שומשום</button>
+      <button class="chip" data-a="soy">סויה</button>
+    </div>
+  </div>
+
+  <button class="scan-btn" id="scan-btn" onclick="toggleScanner()">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M8 12h8"/></svg>
+    סרוק ברקוד
+  </button>
+
+  <div class="scanner-section" id="scanner-section">
+    <div id="video-container">
+      <video id="video" playsinline autoplay muted></video>
+      <div class="scan-overlay">
+        <div class="scan-frame">
+          <div class="sf-bl"></div>
+          <div class="scan-line"></div>
+        </div>
+      </div>
+      <div class="cam-hint">כוון את הברקוד לתוך המסגרת</div>
+    </div>
+
+    <div class="manual-row">
+      <input class="manual-input" id="manual-input" type="tel" placeholder="הזן ברקוד ידנית (7290...)" />
+      <button class="manual-btn" onclick="lookupManual()">בדוק</button>
+    </div>
+
+    <div class="demo-section">
+      <div class="section-label" style="margin-top:.5rem">מוצרי דמו לבדיקה</div>
+      <div class="demo-scroll" id="demo-scroll"></div>
+    </div>
+  </div>
+
+  <div id="result-area"></div>
+
+</div>
+
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+<script>
+// ─── נתוני דמו ───────────────────────────────────────────────
+const DEMO_PRODUCTS = [
+  { name:"עוגיות שוקולד", brand:"אסם", barcode:"7290000066887",
+    ing:["קמח חיטה","סוכר","שוקולד","חמאה","חלב מלא","ביצים","מלח"],
+    has:["milk","gluten","egg"], may:["peanut"], source:"off", days:12 },
+  { name:"גרנולה פירות יער", brand:"תלמה", barcode:"7290004131504",
+    ing:["שיבולת שועל","דבש","פירות מיובשים","שמן חמניות","אגוזים"],
+    has:["gluten"], may:["peanut","milk"], source:"off", days:45 },
+  { name:"חמאת בוטנים", brand:"סוניק", barcode:"7290107400018",
+    ing:["בוטנים קלויים 98%","מלח","שמן דקלים"],
+    has:["peanut"], may:[], source:"local", days:8 },
+  { name:"לחם אורז", brand:"שפע", barcode:"7290012344001",
+    ing:["קמח אורז","מים","שמרים","מלח","שמן זית"],
+    has:[], may:[], source:"off", days:95 },
+  { name:"ביסקוויט שוקולד", brand:"עלית", barcode:"7290000123459",
+    ing:["קמח","סוכר","ביצים","חמאה","שומשום","קקאו"],
+    has:["gluten","egg","milk","sesame"], may:["peanut"], source:"off", days:3 },
+  { name:"טחינה גולמית", brand:"אלתרנטיב", barcode:"7290005124301",
+    ing:["שומשום 100%"], has:["sesame"], may:[], source:"local", days:22 },
+];
+
+const ALLERGEN_NAMES = {
+  peanut:"בוטנים", milk:"חלב", gluten:"גלוטן",
+  egg:"ביצים", sesame:"שומשום", soy:"סויה"
+};
+
+const ING_KEYWORDS = {
+  milk: ["חלב","חמאה","גבינה","שמנת","יוגורט"],
+  peanut: ["בוטנ"],
+  gluten: ["קמח","שיבולת שועל"],
+  egg: ["ביצ"],
+  sesame: ["שומשום"],
+  soy: ["סויה","סוי"]
+};
+
+// ─── מצב אפליקציה ─────────────────────────────────────────────
+let active = new Set(["peanut","milk"]);
+let scannerOpen = false;
+let codeReader = null;
+let stream = null;
+
+// ─── שבבי אלרגנים ─────────────────────────────────────────────
+document.querySelectorAll(".chip").forEach(c => {
+  c.addEventListener("click", () => {
+    const a = c.dataset.a;
+    if (active.has(a)) { active.delete(a); c.classList.remove("on"); }
+    else               { active.add(a);    c.classList.add("on"); }
+  });
+});
+
+// ─── בניית מוצרי דמו ─────────────────────────────────────────
+function buildDemoButtons() {
+  const el = document.getElementById("demo-scroll");
+  el.innerHTML = DEMO_PRODUCTS.map(p =>
+    `<button class="demo-tag" onclick="simulateScan('${p.barcode}')">${p.name}</button>`
+  ).join("");
+}
+
+// ─── פתיחה/סגירה סורק ────────────────────────────────────────
+function toggleScanner() {
+  scannerOpen = !scannerOpen;
+  const sec = document.getElementById("scanner-section");
+  const btn = document.getElementById("scan-btn");
+  sec.classList.toggle("open", scannerOpen);
+  if (scannerOpen) {
+    btn.classList.add("active");
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> סגור מצלמה`;
+    buildDemoButtons();
+    startCamera();
+  } else {
+    btn.classList.remove("active");
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M8 12h8"/></svg> סרוק ברקוד`;
+    stopCamera();
+  }
+}
+
+// ─── הפעלת מצלמה + ZXing ──────────────────────────────────────
+async function startCamera() {
+  const container = document.getElementById("video-container");
+  const video = document.getElementById("video");
+
+  try {
+    // בקש מצלמה אחורית
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }
+    });
+    video.srcObject = stream;
+
+    // הפעל ZXing
+    if (typeof ZXing !== "undefined") {
+      const hints = new Map();
+      const formats = [
+        ZXing.BarcodeFormat.EAN_13,
+        ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.CODE_128,
+        ZXing.BarcodeFormat.QR_CODE,
+      ];
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+      codeReader = new ZXing.BrowserMultiFormatReader(hints);
+      codeReader.decodeFromVideoDevice(null, "video", (result, err) => {
+        if (result) {
+          const barcode = result.getText();
+          stopCamera();
+          scannerOpen = false;
+          document.getElementById("scanner-section").classList.remove("open");
+          document.getElementById("scan-btn").classList.remove("active");
+          document.getElementById("scan-btn").innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M8 12h8"/></svg> סרוק ברקוד`;
+          lookupBarcode(barcode);
+        }
+      });
+    } else {
+      container.innerHTML = `<div class="cam-error">ספריית ZXing לא נטענה.<br>נסה להזין ברקוד ידנית למטה.</div>`;
+    }
+  } catch (err) {
+    let msg = "לא ניתן לגשת למצלמה.";
+    if (err.name === "NotAllowedError")  msg = "גישה למצלמה נדחתה.<br>אפשר גישה בהגדרות הדפדפן ורענן.";
+    if (err.name === "NotFoundError")    msg = "לא נמצאה מצלמה במכשיר.";
+    if (err.name === "NotSupportedError") msg = "הדפדפן לא תומך בגישה למצלמה.<br>נסה Chrome או Safari עדכני.";
+    container.innerHTML = `<div class="cam-error">${msg}<br><br>ניתן להשתמש בכניסה ידנית למטה.</div>`;
+  }
+}
+
+function stopCamera() {
+  if (codeReader) { codeReader.reset(); codeReader = null; }
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+}
+
+// ─── חיפוש לפי ברקוד ─────────────────────────────────────────
+function lookupManual() {
+  const val = document.getElementById("manual-input").value.trim();
+  if (!val) return;
+  lookupBarcode(val);
+}
+
+function simulateScan(barcode) {
+  toggleScanner();
+  setTimeout(() => lookupBarcode(barcode), 200);
+}
+
+async function lookupBarcode(barcode) {
+  const area = document.getElementById("result-area");
+
+  // הצג loading
+  area.innerHTML = `<div class="loading"><div class="spinner"></div><span>מחפש "${barcode}"...</span></div>`;
+
+  // קודם בדוק מסד נתונים מקומי (דמו)
+  const local = DEMO_PRODUCTS.find(p => p.barcode === barcode);
+  if (local) {
+    await delay(600);
+    showResult({ ...local, source: "local" });
+    return;
+  }
+
+  // נסה Open Food Facts
+  try {
+    const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const data = await res.json();
+    if (data.status === 1) {
+      const p = data.product;
+      const allergensList = parseOFFAllergens(p.allergens_tags || []);
+      const mayList = parseOFFAllergens(p.traces_tags || []);
+      showResult({
+        name: p.product_name || p.product_name_he || "מוצר לא ידוע",
+        brand: p.brands || "",
+        barcode,
+        ing: (p.ingredients_text_he || p.ingredients_text || "").split(/[,،]/).map(s => s.trim()).filter(Boolean),
+        has: allergensList,
+        may: mayList,
+        source: "off",
+        days: Math.floor((Date.now() - (p.last_modified_t * 1000)) / 86400000),
+      });
+    } else {
+      showNotFound(barcode);
+    }
+  } catch (e) {
+    // אם ה-API לא זמין — הצג not found
+    showNotFound(barcode);
+  }
+}
+
+function parseOFFAllergens(tags) {
+  const map = { "en:peanuts":"peanut", "en:milk":"milk", "en:gluten":"gluten",
+    "en:eggs":"egg", "en:sesame-seeds":"sesame", "en:soybeans":"soy" };
+  return tags.map(t => map[t]).filter(Boolean);
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ─── הצגת תוצאה ───────────────────────────────────────────────
+function showResult(p) {
+  const danger = p.has.filter(a => active.has(a));
+  const warn   = p.may.filter(a => active.has(a));
+
+  let bannerClass, bannerIcon, btitle, bsub;
+  if (danger.length) {
+    bannerClass = "danger";
+    bannerIcon  = "⚠";
+    btitle      = `מכיל: ${danger.map(a => ALLERGEN_NAMES[a]).join(", ")}`;
+    bsub        = "לא בטוח לאכילה — אל תצרוך מוצר זה";
+  } else if (warn.length) {
+    bannerClass = "warn";
+    bannerIcon  = "!";
+    btitle      = `עלול להכיל: ${warn.map(a => ALLERGEN_NAMES[a]).join(", ")}`;
+    bsub        = "ייתכן זיהום צולב — היזהר";
+  } else {
+    bannerClass = "safe";
+    bannerIcon  = "✓";
+    btitle      = "בטוח לאכילה";
+    bsub        = "לא נמצאו אלרגנים רלוונטיים";
+  }
+
+  const ingHtml = p.ing.map(i => {
+    const isDanger = Object.entries(ING_KEYWORDS).some(([key, words]) =>
+      active.has(key) && p.has.includes(key) && words.some(w => i.includes(w))
+    );
+    return isDanger ? `<span class="hi-ing">${i}</span>` : i;
+  }).join(", ") || "לא זמין";
+
+  const freshColor = p.days < 30 ? "#4ade80" : p.days < 90 ? "#fb923c" : "#f87171";
+  const freshMsg   = p.days < 30  ? `עודכן לפני ${p.days} ימים`
+                   : p.days < 90  ? `עודכן לפני ${p.days} ימים — כדאי לאמת`
+                   : p.days >= 90 ? `לא עודכן ${p.days} ימים — מומלץ לבדוק ידנית`
+                   : "תאריך עדכון לא ידוע";
+
+  const srcLabel = p.source === "off" ? "Open Food Facts" : "מסד נתונים שלי";
+  const srcClass = p.source === "off" ? "src-off" : "src-local";
+
+  document.getElementById("result-area").innerHTML = `
+    <div class="result-card">
+      <div class="banner ${bannerClass}">
+        <div class="banner-icon">${bannerIcon}</div>
+        <div class="banner-text">
+          <div class="btitle">${btitle}</div>
+          <div class="bsub">${bsub}</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="pname">${p.name}</div>
+        <div class="pbrand">${p.brand}</div>
+        <div class="meta-row">
+          <span class="barcode-num">${p.barcode}</span>
+          <span class="src-badge ${srcClass}">${srcLabel}</span>
+        </div>
+        <div class="ing-label">רכיבים</div>
+        <div class="ing-text">${ingHtml}</div>
+        <div class="freshness-row">
+          <span class="fresh-dot" style="background:${freshColor}"></span>
+          <span class="fresh-msg">${freshMsg}</span>
+          <button class="report-btn" onclick="reportChange('${p.name}')">המתכון השתנה?</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function showNotFound(barcode) {
+  document.getElementById("result-area").innerHTML = `
+    <div class="not-found">
+      <div class="nf-title">מוצר לא נמצא</div>
+      <div class="nf-sub">ברקוד ${barcode} לא קיים במסד הנתונים.<br>תוכל להוסיף אותו ידנית.</div>
+      <button class="add-btn" onclick="showToast('בקרוב — הוספת מוצר ידנית')">+ הוסף מוצר חדש</button>
+    </div>`;
+}
+
+function reportChange(name) {
+  showToast(`תודה! הדיווח על "${name}" נשלח לבדיקה`);
+}
+
+function showToast(msg) {
+  const existing = document.querySelector(".toast");
+  if (existing) existing.remove();
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// Enter בשדה ברקוד
+document.getElementById("manual-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") lookupManual();
+});
+</script>
+</body>
+</html>
